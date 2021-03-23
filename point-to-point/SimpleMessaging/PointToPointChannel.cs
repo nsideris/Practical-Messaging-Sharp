@@ -29,19 +29,20 @@ namespace SimpleMessaging
         public PointToPointChannel(string queueName, string hostName = "localhost")
         {
             //just use defaults: usr: guest pwd: guest port:5672 virtual host: /
-            var factory = new ConnectionFactory() { HostName = hostName };
+            var factory = new ConnectionFactory() {HostName = hostName};
             factory.AutomaticRecoveryEnabled = true;
             _connection = factory.CreateConnection();
             _channel = _connection.CreateModel();
-            
+
             //Because we are point to point, we are just going to use queueName for the routing key
             _routingKey = queueName;
             _queueName = queueName;
-            
-            //TODO: declare a non-durable direct exchange via the channel
-            //TODO: declare a non-durable queue. non-exc;usive, that does not auto-delete. Use _queuename
-            //TODO: bind _queuename to _routingKey on the exchange
-       }
+
+
+            _channel.ExchangeDeclare(ExchangeName, ExchangeType.Direct, durable: false);
+            _channel.QueueDeclare(_queueName, durable: false, exclusive: false, autoDelete: false);
+            _channel.QueueBind(_queueName, ExchangeName, _routingKey);
+        }
 
         /// <summary>
         /// Send a message over the channel
@@ -52,7 +53,7 @@ namespace SimpleMessaging
         public void Send(string message)
         {
             var body = Encoding.UTF8.GetBytes(message);
-            //TODO: Publish on the exchange using the routing key
+            _channel.BasicPublish(ExchangeName, _routingKey, body: body);
         }
 
         /// <summary>
@@ -63,13 +64,12 @@ namespace SimpleMessaging
         /// <returns></returns>
         public string Receive()
         {
-            //TODO: Use basic get to read a message, don't auto acknowledge the message
-            //var result = 
-            //if (result != null)
-            //    return Encoding.UTF8.GetString(result.Body);
-            //else
+            var result = _channel.BasicGet(_queueName, autoAck: false);
+            if (result != null)
+                return Encoding.UTF8.GetString(result.Body);
+            else
                 return null;
-        }   
+        }
 
         public void Dispose()
         {
@@ -81,7 +81,6 @@ namespace SimpleMessaging
         {
             ReleaseUnmanagedResources();
         }
-
 
 
         private void ReleaseUnmanagedResources()

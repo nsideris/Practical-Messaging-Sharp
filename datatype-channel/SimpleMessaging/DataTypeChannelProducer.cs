@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Text;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Framing;
 
 namespace SimpleMessaging
 {
-    public class DataTypeChannelProducer<T> : IDisposable where T: IAmAMessage
+    public class DataTypeChannelProducer<T> : IDisposable where T : IAmAMessage
     {
         private readonly Func<T, string> _messageSerializer;
         private string _routingKey;
@@ -32,20 +33,21 @@ namespace SimpleMessaging
         {
             _messageSerializer = messageSerializer;
             //just use defaults: usr: guest pwd: guest port:5672 virtual host: /
-            var factory = new ConnectionFactory() { HostName = hostName };
+            var factory = new ConnectionFactory() {HostName = hostName};
             factory.AutomaticRecoveryEnabled = true;
             _connection = factory.CreateConnection();
             _channel = _connection.CreateModel();
-            
+
             //Because we are point to point, we are just going to use queueName for the routing key
             _routingKey = typeof(T).Name;
             //just use the routing key as the queue name; we are still point-to-point
             var queueName = _routingKey;
-            
+
             _channel.ExchangeDeclare(ExchangeName, ExchangeType.Direct, durable: false);
-            _channel.QueueDeclare(queue: queueName, durable: false, exclusive: false, autoDelete: false, arguments: null);
-            _channel.QueueBind(queue:queueName, exchange: ExchangeName, routingKey: _routingKey);
-     }
+            _channel.QueueDeclare(queue: queueName, durable: false, exclusive: false, autoDelete: false,
+                arguments: null);
+            _channel.QueueBind(queue: queueName, exchange: ExchangeName, routingKey: _routingKey);
+        }
 
         /// <summary>
         /// Send a message over the channel
@@ -54,8 +56,8 @@ namespace SimpleMessaging
         /// <param name="message"></param>
         public void Send(T message)
         {
-            //TODO: Serialize the message Tip, convert to UTF8
-            _channel.BasicPublish(exchange: ExchangeName, routingKey: _routingKey, basicProperties: null, body: body);
+            var body = Encoding.UTF8.GetBytes(_messageSerializer(message));
+            _channel.BasicPublish(ExchangeName, _routingKey, false, null, body);
         }
 
         public void Dispose()
@@ -68,7 +70,6 @@ namespace SimpleMessaging
         {
             ReleaseUnmanagedResources();
         }
-
 
 
         private void ReleaseUnmanagedResources()

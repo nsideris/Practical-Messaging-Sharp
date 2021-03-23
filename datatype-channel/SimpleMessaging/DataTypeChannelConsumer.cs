@@ -4,7 +4,7 @@ using RabbitMQ.Client;
 
 namespace SimpleMessaging
 {
-    public class DataTypeChannelConsumer<T> : IDisposable where T: IAmAMessage
+    public class DataTypeChannelConsumer<T> : IDisposable where T : IAmAMessage
     {
         private readonly Func<string, T> _messageDeserializer;
         private readonly string _queueName;
@@ -30,20 +30,21 @@ namespace SimpleMessaging
         {
             _messageDeserializer = messageDeserializer;
             //just use defaults: usr: guest pwd: guest port:5672 virtual host: /
-            var factory = new ConnectionFactory() { HostName = hostName };
+            var factory = new ConnectionFactory() {HostName = hostName};
             factory.AutomaticRecoveryEnabled = true;
             _connection = factory.CreateConnection();
             _channel = _connection.CreateModel();
-            
-             /* We choose to base the key off the type name, because we want tp publish to folks interested in this type
-              We name the queue after that routing key as we are point-to-point and only expect one queue to receive
-             this type of message */
+
+            /* We choose to base the key off the type name, because we want tp publish to folks interested in this type
+             We name the queue after that routing key as we are point-to-point and only expect one queue to receive
+            this type of message */
             var routingKey = typeof(T).Name;
             _queueName = routingKey;
-            
+
             _channel.ExchangeDeclare(ExchangeName, ExchangeType.Direct, durable: false);
-            _channel.QueueDeclare(queue: _queueName, durable: false, exclusive: false, autoDelete: false, arguments: null);
-            _channel.QueueBind(queue:_queueName, exchange: ExchangeName, routingKey: routingKey);
+            _channel.QueueDeclare(queue: _queueName, durable: false, exclusive: false, autoDelete: false,
+                arguments: null);
+            _channel.QueueBind(queue: _queueName, exchange: ExchangeName, routingKey: routingKey);
         }
 
         /// <summary>
@@ -56,10 +57,10 @@ namespace SimpleMessaging
         {
             var result = _channel.BasicGet(_queueName, autoAck: true);
             if (result != null)
-                //TODO: deserialize the message
+                return _messageDeserializer(Encoding.UTF8.GetString(result.Body));
             else
-                return default(T) ;
-        }   
+                return default(T);
+        }
 
         public void Dispose()
         {
@@ -71,7 +72,6 @@ namespace SimpleMessaging
         {
             ReleaseUnmanagedResources();
         }
-
 
 
         private void ReleaseUnmanagedResources()
